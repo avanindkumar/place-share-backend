@@ -1,46 +1,66 @@
-const { v4: uuid } = require("uuid");
 const HttpError = require("../models/http-error");
 const { validationResult } = require("express-validator");
+const User = require("../models/User");
 
-const DUMMY_USERS = [
-  {
-    id: "u1",
-    name: "Avanind",
-    image:
-      "https://media.istockphoto.com/id/1164329797/photo/hindu-sadhu-sitting-on-a-boat-overlooking-varanasi-city-architecture-at-sunset.jpg?s=612x612&w=0&k=20&c=LbpIHRo7kGT7dbUr6b6UuD1d6P0yCaKZ2lbqo3TY988=",
-    places: 3,
-  },
-];
-const getAllUsers = (req, res, next) => {
-  res.json({ users: DUMMY_USERS });
+const getAllUsers = async (req, res, next) => {
+  let users;
+  try {
+    users = await User.find({}, "-password");
+  } catch (error) {
+    console.log(error);
+    return next(new HttpError("Something went wrong with database", 500));
+  }
+  res.json(users.map((user) => user.toObject({ getters: true })));
 };
-const signup = (req, res, next) => {
+const signup = async (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    throw new HttpError("Invalid data found please check your data", 422);
+    return next(
+      new HttpError("Invalid data found please check your data", 422)
+    );
   }
   const { name, email, password } = req.body;
-  const existingEmail = DUMMY_USERS.find((u) => u.email === email);
-  if (existingEmail) {
-    throw new HttpError("Email Already exist", 401);
+  let existingEmail;
+  try {
+    existingEmail = await User.findOne({ email: email });
+  } catch (error) {
+    console.log(error);
+    return next(new HttpError("Something went wrong with database", 500));
   }
-  const id = uuid();
-  const newUser = {
-    id,
+  if (existingEmail) {
+    return next(new HttpError("Email Already exist", 401));
+  }
+  const newUser = new User({
     name,
     email,
     password,
-  };
-  USERS.push(newUser);
-  res.json({ newUser });
+    image:
+      "https://images.hindustantimes.com/img/2021/12/20/1600x900/6cd32fe4-61a2-11ec-8bb7-69f77148494e_1640011166463.jpg",
+    places: [],
+  });
+  try {
+    await newUser.save();
+  } catch (error) {
+    console.log(error);
+    return next(new HttpError("Something went wrong with database", 500));
+  }
+  res.json(newUser.toObject({ getters: true }));
 };
-const login = (req, res, next) => {
+const login = async (req, res, next) => {
   const { email, password } = req.body;
-  const identifiedUser = USERS.find((u) => u.email === email);
-  if (!identifiedUser || identifiedUser.password !== password) {
+  let existingEmail;
+  try {
+    existingEmail = await User.findOne({ email: email });
+  } catch (error) {
+    console.log(error);
+    return next(new HttpError("Something went wrong with database", 500));
+  }
+  if (!existingEmail) {
+    return next(new HttpError("Email do not exist. Plz SignUp", 401));
+  }
+  if (existingEmail.password !== password) {
     throw new HttpError("Email id or Password mismatch", 401);
   }
-
   return res.status(200).json("Login Success");
 };
 
