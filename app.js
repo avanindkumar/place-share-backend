@@ -1,3 +1,4 @@
+require("dotenv").config();
 const express = require("express");
 const bodyParser = require("body-parser");
 const mongoose = require("mongoose");
@@ -25,9 +26,7 @@ app.use((error, req, res, next) => {
 });
 
 mongoose
-  .connect(
-    `mongodb+srv://avanindkumar:REOdmUHrlIVEsD8b@cluster0.ikmwvvw.mongodb.net/places?retryWrites=true&w=majority`
-  )
+  .connect(process.env.MONGODB_URL)
   .then(() => {
     app.listen(5000, () => {
       console.log("http://localhost:5000/");
