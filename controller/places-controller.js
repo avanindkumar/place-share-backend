@@ -4,6 +4,7 @@ const { getCoordsForAddress } = require("../util/location");
 const Place = require("../models/Place");
 const { default: mongoose } = require("mongoose");
 const User = require("../models/User");
+const fs = require("fs");
 
 const createPlace = async (req, res, next) => {
   const errors = validationResult(req);
@@ -23,13 +24,12 @@ const createPlace = async (req, res, next) => {
     description,
     address,
     location: coordinates,
-    image:
-      "https://images.hindustantimes.com/img/2021/12/20/1600x900/6cd32fe4-61a2-11ec-8bb7-69f77148494e_1640011166463.jpg",
-    creator,
+    image: req.file.path,
+    creator: req.userData.userId,
   });
   let user;
   try {
-    user = await User.findById(creator);
+    user = await User.findById(req.userData.userId);
   } catch (err) {
     console.log(err);
     return next(new HttpError("Creating places failed", 500));
@@ -86,7 +86,9 @@ const getPlaceByUserId = async (req, res, next) => {
 const updatePlace = async (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    throw new HttpError("Invalid data found please check your data", 422);
+    return next(
+      new HttpError("Invalid data found please check your data", 422)
+    );
   }
   const placeId = req.params.pid;
   const { title, description } = req.body;
@@ -95,6 +97,9 @@ const updatePlace = async (req, res, next) => {
     place = await Place.findById(placeId);
   } catch (error) {
     return next(new HttpError("Something went wrong with database", 500));
+  }
+  if (place.creator.toString() !== req.userData.userId) {
+    return next(new HttpError("You are not allowed to edit this place", 401));
   }
   place.title = title;
   place.description = description;
@@ -118,6 +123,10 @@ const deletePlace = async (req, res, next) => {
   if (!place) {
     return next(new HttpError("Could not find the place by id", 404));
   }
+  if (place.creator.id !== req.userData.userId) {
+    return next(new HttpError("You are not allowed to delete this place", 401));
+  }
+  const imagePath = place.image;
   try {
     const sess = await mongoose.startSession();
     sess.startTransaction();
@@ -130,6 +139,9 @@ const deletePlace = async (req, res, next) => {
       new HttpError("Something went wrong could not delete the palce", 500)
     );
   }
+  fs.unlink(imagePath, (err) => {
+    console.log(err);
+  });
   res.json({ message: "Place Deleted" });
 };
 

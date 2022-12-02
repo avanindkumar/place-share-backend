@@ -1,6 +1,8 @@
 const HttpError = require("../models/http-error");
 const { validationResult } = require("express-validator");
 const User = require("../models/User");
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
 
 const getAllUsers = async (req, res, next) => {
   let users;
@@ -30,12 +32,18 @@ const signup = async (req, res, next) => {
   if (existingEmail) {
     return next(new HttpError("Email Already exist", 401));
   }
+  let hashedPassword;
+  try {
+    hashedPassword = await bcrypt.hash(password, 12);
+  } catch (error) {
+    return next(new HttpError("Something went wrong with database", 500));
+  }
+
   const newUser = new User({
     name,
     email,
-    password,
-    image:
-      "https://images.hindustantimes.com/img/2021/12/20/1600x900/6cd32fe4-61a2-11ec-8bb7-69f77148494e_1640011166463.jpg",
+    password: hashedPassword,
+    image: req.file.path,
     places: [],
   });
   try {
@@ -44,7 +52,18 @@ const signup = async (req, res, next) => {
     console.log(error);
     return next(new HttpError("Something went wrong with database", 500));
   }
-  res.json(newUser.toObject({ getters: true }));
+
+  let token;
+  try {
+    token = jwt.sign(
+      { userId: newUser.id, email: newUser.email },
+      process.env.JWT_KEY,
+      { expiresIn: "1h" }
+    );
+  } catch (error) {
+    return next(new HttpError("Something went wrong with database", 500));
+  }
+  res.json({ user: newUser.id, email: newUser.email, token: token });
 };
 const login = async (req, res, next) => {
   const { email, password } = req.body;
@@ -52,16 +71,35 @@ const login = async (req, res, next) => {
   try {
     existingEmail = await User.findOne({ email: email });
   } catch (error) {
-    console.log(error);
     return next(new HttpError("Something went wrong with database", 500));
   }
   if (!existingEmail) {
     return next(new HttpError("Email do not exist. Plz SignUp", 401));
   }
-  if (existingEmail.password !== password) {
-    throw new HttpError("Email id or Password mismatch", 401);
+  let isValidPassword = false;
+  try {
+    isValidPassword = await bcrypt.compare(password, existingEmail.password);
+  } catch (error) {
+    return next(new HttpError("Something went wrong with database", 500));
   }
-  return res.status(200).json("Login Success");
+  if (!isValidPassword) {
+    return next(new HttpError("Email id or Password mismatch", 403));
+  }
+  let token;
+  try {
+    token = jwt.sign(
+      { userId: existingEmail.id, email: existingEmail.email },
+      process.env.JWT_KEY,
+      { expiresIn: "1h" }
+    );
+  } catch (error) {
+    return next(new HttpError("Something went wrong with database", 500));
+  }
+  return res.status(200).json({
+    userId: existingEmail.id,
+    email: existingEmail.email,
+    token: token,
+  });
 };
 
 exports.getAllUsers = getAllUsers;
