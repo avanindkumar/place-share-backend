@@ -1,4 +1,6 @@
+const { S3 } = require("aws-sdk");
 const multer = require("multer");
+const multerS3 = require("multer-s3");
 const { v4: uuid } = require("uuid");
 const MIME_TYPE_MAP = {
   "image/png": "png",
@@ -6,17 +8,11 @@ const MIME_TYPE_MAP = {
   "image/jpeg": "jpeg",
 };
 
+const storage = multer.memoryStorage();
+
 const fileUpload = multer({
   limits: 500000,
-  storage: multer.diskStorage({
-    destination: (req, file, cb) => {
-      cb(null, "uploads/images");
-    },
-    filename: (req, file, cb) => {
-      const ext = MIME_TYPE_MAP[file.mimetype];
-      cb(null, uuid() + "." + ext);
-    },
-  }),
+  storage,
   fileFilter: (req, file, cb) => {
     const isValid = !!MIME_TYPE_MAP[file.mimetype];
     let error = isValid ? null : Error("Invalid mime type!");

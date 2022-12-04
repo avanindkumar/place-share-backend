@@ -5,18 +5,28 @@ const Place = require("../models/Place");
 const { default: mongoose } = require("mongoose");
 const User = require("../models/User");
 const fs = require("fs");
+const { s3Upload } = require("../util/s3Service");
+const { v4: uuidv4 } = require("uuid");
 
 const createPlace = async (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     throw new HttpError("Invalid data found please check your data", 422);
   }
-  const { title, description, address, creator } = req.body;
+  const { title, description, address } = req.body;
   let coordinates;
   try {
     coordinates = await getCoordsForAddress(address);
   } catch (error) {
     return next(error);
+  }
+  let fileName;
+  try {
+    const ext = req.file.mimetype.split("/")[1];
+    fileName = `${"places/" + uuidv4()}.${ext}`;
+    await s3Upload(req.file, fileName);
+  } catch (error) {
+    return next(new HttpError("Unable to upload image to S3", 500));
   }
 
   const createdPlace = new Place({
@@ -24,7 +34,7 @@ const createPlace = async (req, res, next) => {
     description,
     address,
     location: coordinates,
-    image: req.file.path,
+    image: `https://place-share-app.s3.ap-south-1.amazonaws.com/${fileName}`,
     creator: req.userData.userId,
   });
   let user;
@@ -139,9 +149,6 @@ const deletePlace = async (req, res, next) => {
       new HttpError("Something went wrong could not delete the palce", 500)
     );
   }
-  fs.unlink(imagePath, (err) => {
-    console.log(err);
-  });
   res.json({ message: "Place Deleted" });
 };
 

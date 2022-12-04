@@ -3,7 +3,8 @@ const { validationResult } = require("express-validator");
 const User = require("../models/User");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-
+const { s3Upload } = require("../util/s3Service");
+const { v4: uuidv4 } = require("uuid");
 const getAllUsers = async (req, res, next) => {
   let users;
   try {
@@ -38,12 +39,20 @@ const signup = async (req, res, next) => {
   } catch (error) {
     return next(new HttpError("Something went wrong with database", 500));
   }
+  let fileName;
+  try {
+    const ext = req.file.mimetype.split("/")[1];
+    fileName = `${"users/" + uuidv4()}.${ext}`;
+    await s3Upload(req.file, fileName);
+  } catch (error) {
+    return next(new HttpError("Unable to upload image to S3", 500));
+  }
 
   const newUser = new User({
     name,
     email,
     password: hashedPassword,
-    image: req.file.path,
+    image: `https://place-share-app.s3.ap-south-1.amazonaws.com/${fileName}`,
     places: [],
   });
   try {
@@ -63,7 +72,7 @@ const signup = async (req, res, next) => {
   } catch (error) {
     return next(new HttpError("Something went wrong with database", 500));
   }
-  res.json({ user: newUser.id, email: newUser.email, token: token });
+  res.json({ userId: newUser.id, email: newUser.email, token: token });
 };
 const login = async (req, res, next) => {
   const { email, password } = req.body;
@@ -105,3 +114,7 @@ const login = async (req, res, next) => {
 exports.getAllUsers = getAllUsers;
 exports.signup = signup;
 exports.login = login;
+
+// https://place-share-app.s3.ap-south-1.amazonaws.com/users/users/4efa25d4-e672-4a47-b08a-57efb489cced.jpeg
+
+// https://place-share-app.s3.ap-south-1.amazonaws.com/users/4efa25d4-e672-4a47-b08a-57efb489cced.jpeg
