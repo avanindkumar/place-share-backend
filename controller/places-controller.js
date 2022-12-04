@@ -4,21 +4,22 @@ const { getCoordsForAddress } = require("../util/location");
 const Place = require("../models/Place");
 const { default: mongoose } = require("mongoose");
 const User = require("../models/User");
-const fs = require("fs");
 const { s3Upload } = require("../util/s3Service");
 const { v4: uuidv4 } = require("uuid");
 
 const createPlace = async (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    throw new HttpError("Invalid data found please check your data", 422);
+    return next(
+      new HttpError("Invalid data found please check your data", 422)
+    );
   }
   const { title, description, address } = req.body;
   let coordinates;
   try {
     coordinates = await getCoordsForAddress(address);
   } catch (error) {
-    return next(error);
+    return next(new HttpError("Cannot get the coordinates from API", 422));
   }
   let fileName;
   try {

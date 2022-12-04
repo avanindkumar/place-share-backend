@@ -3,7 +3,12 @@ const HttpError = require("../models/http-error");
 const axios = require("axios");
 const getCoordsForAddress = async (address) => {
   const response = await axios.get(
-    `http://api.positionstack.com/v1/forward?access_key=${process.env.API_KEY}&query=${address}&output=json`
+    `http://api.positionstack.com/v1/forward?access_key=${process.env.COORDINATES_API_KEY}&query=${address}&output=json`,
+    {
+      headers: {
+        "Accept-Encoding": "application/json",
+      },
+    }
   );
   const data = response.data;
   if (!data || data.error) {
