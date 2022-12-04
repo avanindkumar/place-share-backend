@@ -1,8 +1,5 @@
-const {
-  S3Client,
-  PutObjectCommand,
-  DeleteObjectCommand,
-} = require("@aws-sdk/client-s3");
+const AWS = require("aws-sdk");
+const s3 = new AWS.S3();
 
 exports.s3Upload = async (file, fileName) => {
   return s3
