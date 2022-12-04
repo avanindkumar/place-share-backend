@@ -1,7 +1,5 @@
-const { S3 } = require("aws-sdk");
 const multer = require("multer");
-const multerS3 = require("multer-s3");
-const { v4: uuid } = require("uuid");
+
 const MIME_TYPE_MAP = {
   "image/png": "png",
   "image/jpg": "jpg",
